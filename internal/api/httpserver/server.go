@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -102,7 +103,7 @@ func New(
 
 	s.server = &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           mux,
+		Handler:           redirectLegacyHost(mux),
 		ReadTimeout:       cfg.ReadTimeout,
 		WriteTimeout:      cfg.WriteTimeout,
 		IdleTimeout:       60 * time.Second,
@@ -115,6 +116,42 @@ func New(
 func (s *Server) ListenAndServe() error {
 	s.log.Info("api server listening", "addr", s.server.Addr)
 	return s.server.ListenAndServe()
+}
+
+const (
+	canonicalHost = "photon.abhinash.dev"
+	legacyHost    = "swiftbatch.abhinash.dev"
+)
+
+func redirectLegacyHost(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.EqualFold(hostWithoutPort(r.Host), legacyHost) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		target := &url.URL{
+			Scheme:   "https",
+			Host:     canonicalHost,
+			Path:     r.URL.Path,
+			RawPath:  r.URL.RawPath,
+			RawQuery: r.URL.RawQuery,
+		}
+		if target.Path == "" {
+			target.Path = "/"
+		}
+
+		http.Redirect(w, r, target.String(), http.StatusPermanentRedirect)
+	})
+}
+
+func hostWithoutPort(host string) string {
+	host = strings.TrimSpace(host)
+	if idx := strings.Index(host, ":"); idx >= 0 {
+		return host[:idx]
+	}
+
+	return host
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {

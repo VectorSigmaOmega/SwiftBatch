@@ -31,8 +31,8 @@ metadata:
   namespace: photon
 spec:
   redirectRegex:
-    regex: ^https://swiftbatch\.abhinash\.dev/.*$
-    replacement: https://photon.abhinash.dev/
+    regex: ^https?://swiftbatch\.abhinash\.dev(/.*)?$
+    replacement: https://photon.abhinash.dev$1
     permanent: true
 ---
 apiVersion: networking.k8s.io/v1

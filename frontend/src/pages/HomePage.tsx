@@ -320,10 +320,10 @@ export function HomePage() {
       <div className="flex w-full max-w-[760px] flex-col px-6 pt-[6vh] pb-6">
         <div className="flex items-center gap-3">
           <svg width="25" height="25" viewBox="0 0 22 22" fill="none" className="hero-mark-enter">
-            <circle cx="11" cy="11" r="10" stroke={TEXT} strokeOpacity="0.6" strokeWidth="1" />
+            <circle cx="11" cy="11" r="8" stroke={TEXT} strokeOpacity="0.6" strokeWidth="1" />
             <circle cx="11" cy="11" r="3" fill={ACCENT} />
           </svg>
-          <span className="hero-mark-enter text-[17px]" style={{ fontWeight: 500 }}>
+          <span className="hero-mark-enter text-[16px]" style={{ fontWeight: 500 }}>
             Photon
           </span>
         </div>
@@ -334,7 +334,7 @@ export function HomePage() {
             style={{
               fontFamily: "'Fraunces', serif",
               fontWeight: 300,
-              fontSize: "68px",
+              fontSize: "60px",
               lineHeight: 0.95,
             }}
           >
@@ -347,7 +347,7 @@ export function HomePage() {
           </h1>
         </div>
 
-        <div className="mt-8 flex h-[210px] flex-col overflow-hidden">
+        <div className="mt-10 flex h-[250px] flex-col overflow-hidden">
           {showResults ? (
             <ResultStrip outputs={outputs} />
           ) : hasBatch ? (
@@ -366,62 +366,68 @@ export function HomePage() {
           )}
         </div>
 
-        <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-3">
-          <div className="grid grid-cols-[40px_auto] items-center gap-2">
-            <span style={mono(11, FAINT)}>fmt</span>
-            <div
-              className="inline-flex rounded-md p-0.5"
-              style={{ background: SURF, border: `1px solid ${RULE}` }}
-            >
-              {FORMAT_OPTIONS.map((option) => {
-                const active = format === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    disabled={controlsLocked}
-                    onClick={() => setFormat(option.id)}
-                    className="inline-flex min-h-[20px] items-center rounded px-5 py-1 transition-colors disabled:opacity-40"
-                    style={{
-                      ...mono(10, active ? ACCENT : FAINT),
-                      background: active ? SURF_HI : "transparent",
-                    }}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
+        <div className="mt-10 flex flex-wrap items-end gap-x-5 gap-y-3">
+          <div className="grid gap-y-3">
+            <div className="grid grid-cols-[40px_auto] items-center gap-2">
+              <span style={mono(11, FAINT)}>
+                fmt
+              </span>
+              <div
+                className="inline-flex rounded-md p-0.5"
+                style={{ background: SURF, border: `1px solid ${RULE}` }}
+              >
+                {FORMAT_OPTIONS.map((option) => {
+                  const active = format === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      disabled={controlsLocked}
+                      onClick={() => setFormat(option.id)}
+                      className="inline-flex min-h-[20px] items-center rounded px-5 py-1 transition-colors disabled:opacity-40"
+                      style={{
+                        ...mono(10, active ? ACCENT : FAINT),
+                        background: active ? SURF_HI : "transparent",
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-[40px_auto] items-center gap-2">
-            <span style={mono(11, FAINT)}>crops</span>
-            <div className="inline-flex flex-wrap items-center gap-1.5">
-              {VARIANT_OPTIONS.map((variant) => {
-                const active = variants.has(variant.id);
-                return (
-                  <button
-                    key={variant.id}
-                    type="button"
-                    disabled={controlsLocked}
-                    onClick={() => toggleVariant(variant.id)}
-                    className="inline-flex min-h-[20px] items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] transition-colors disabled:opacity-40"
-                    style={{
-                      background: active ? SURF_HI : SURF,
-                      color: active ? TEXT : MUTE,
-                      border: `1px solid ${active ? "oklch(75% 0.16 50 / 0.5)" : RULE}`,
-                      width: CROP_BUTTON_WIDTHS[variant.id],
-                      justifyContent: "flex-start",
-                    }}
-                  >
-                    <span
-                      className="inline-block h-1.5 w-1.5 rounded-full"
-                      style={{ background: active ? ACCENT : FAINT }}
-                    />
-                    {variant.label}
-                  </button>
-                );
-              })}
+            <div className="grid grid-cols-[40px_auto] items-center gap-2">
+              <span className="text-right" style={mono(11, FAINT)}>
+                crops
+              </span>
+              <div className="inline-flex flex-wrap items-center gap-1.5">
+                {VARIANT_OPTIONS.map((variant) => {
+                  const active = variants.has(variant.id);
+                  return (
+                    <button
+                      key={variant.id}
+                      type="button"
+                      disabled={controlsLocked}
+                      onClick={() => toggleVariant(variant.id)}
+                      className="inline-flex min-h-[20px] items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] transition-colors disabled:opacity-40"
+                      style={{
+                        background: active ? SURF_HI : SURF,
+                        color: active ? TEXT : MUTE,
+                        border: `1px solid ${active ? "oklch(75% 0.16 50 / 0.5)" : RULE}`,
+                        width: CROP_BUTTON_WIDTHS[variant.id],
+                        justifyContent: "flex-start",
+                      }}
+                    >
+                      <span
+                        className="inline-block h-1.5 w-1.5 rounded-full"
+                        style={{ background: active ? ACCENT : FAINT }}
+                      />
+                      {variant.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

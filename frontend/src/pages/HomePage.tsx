@@ -347,7 +347,7 @@ export function HomePage() {
           </h1>
         </div>
 
-        <div className="mt-10 flex h-[250px] flex-col overflow-hidden">
+        <div className="mt-8 flex h-[260px] flex-col overflow-hidden">
           {showResults ? (
             <ResultStrip outputs={outputs} />
           ) : hasBatch ? (
@@ -561,7 +561,7 @@ function Drop({
         </div>
       ) : (
         <div className="grid h-full min-h-0 w-full grid-rows-[auto,minmax(0,1fr)]">
-          <div className="flex min-h-[62px] items-center justify-between gap-4">
+          <div className="flex min-h-[48px] items-center justify-between gap-5">
             <div className="min-w-0">
               <div
                 className="text-[18px]"
@@ -592,7 +592,7 @@ function Drop({
             </button>
           </div>
 
-          <div className="mt-3 min-h-0 overflow-hidden">
+          <div className="mt-5 min-h-0 overflow-hidden">
             <div className="styled-scrollbar h-full overflow-y-scroll overflow-x-hidden pr-2">
               <div className="flex flex-wrap content-start gap-3">
                 {items.map((item) => (
@@ -600,7 +600,7 @@ function Drop({
                     <img
                       src={item.previewURL}
                       alt={item.file.name}
-                      className="h-20 w-20 rounded-md object-cover"
+                      className="h-16 w-16 rounded-md object-cover"
                       style={{ border: `1px solid ${RULE}` }}
                     />
                     <button
@@ -626,7 +626,7 @@ function Drop({
                 ))}
 
                 <span
-                  className="grid h-20 w-20 shrink-0 place-items-center rounded-md"
+                  className="grid h-16 w-16 shrink-0 place-items-center rounded-md"
                   style={{ border: "1px dashed oklch(94% 0.018 80 / 0.18)", ...mono(10, FAINT) }}
                 >
                   + add

@@ -328,7 +328,7 @@ export function HomePage() {
           </span>
         </div>
 
-        <div className="mt-5">
+        <div className="mt-4">
           <h1
             className="hero-heading-enter tracking-[-0.02em]"
             style={{
@@ -347,7 +347,7 @@ export function HomePage() {
           </h1>
         </div>
 
-        <div className="mt-8 flex h-[260px] flex-col overflow-hidden">
+        <div className="mt-10 flex h-[260px] flex-col overflow-hidden">
           {showResults ? (
             <ResultStrip outputs={outputs} />
           ) : hasBatch ? (

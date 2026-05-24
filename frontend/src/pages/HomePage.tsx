@@ -347,7 +347,7 @@ export function HomePage() {
           </h1>
         </div>
 
-        <div className="mt-10 flex h-[260px] flex-col overflow-hidden">
+        <div className="mt-12 flex h-[250px] flex-col overflow-hidden">
           {showResults ? (
             <ResultStrip outputs={outputs} />
           ) : hasBatch ? (
@@ -366,14 +366,14 @@ export function HomePage() {
           )}
         </div>
 
-        <div className="mt-10 flex flex-wrap items-end gap-x-5 gap-y-3">
+        <div className="mt-7 flex flex-wrap items-start gap-x-5 gap-y-3">
           <div className="grid gap-y-3">
             <div className="grid grid-cols-[40px_auto] items-center gap-2">
               <span style={mono(11, FAINT)}>
                 fmt
               </span>
               <div
-                className="inline-flex rounded-md p-0.5"
+                className="inline-flex w-[276px] rounded-md p-0.5"
                 style={{ background: SURF, border: `1px solid ${RULE}` }}
               >
                 {FORMAT_OPTIONS.map((option) => {
@@ -384,7 +384,7 @@ export function HomePage() {
                       type="button"
                       disabled={controlsLocked}
                       onClick={() => setFormat(option.id)}
-                      className="inline-flex min-h-[20px] items-center rounded px-5 py-1 transition-colors disabled:opacity-40"
+                      className="inline-flex min-h-[20px] flex-1 items-center justify-center rounded px-3 py-1 transition-colors disabled:opacity-40"
                       style={{
                         ...mono(10, active ? ACCENT : FAINT),
                         background: active ? SURF_HI : "transparent",
@@ -561,7 +561,7 @@ function Drop({
         </div>
       ) : (
         <div className="grid h-full min-h-0 w-full grid-rows-[auto,minmax(0,1fr)]">
-          <div className="flex min-h-[48px] items-center justify-between gap-5">
+          <div className="flex min-h-[24px] items-center justify-between gap-5">
             <div className="min-w-0">
               <div
                 className="text-[18px]"
@@ -592,7 +592,7 @@ function Drop({
             </button>
           </div>
 
-          <div className="mt-5 min-h-0 overflow-hidden">
+          <div className="mt-3 min-h-0 overflow-hidden">
             <div className="styled-scrollbar h-full overflow-y-scroll overflow-x-hidden pr-2">
               <div className="flex flex-wrap content-start gap-3">
                 {items.map((item) => (

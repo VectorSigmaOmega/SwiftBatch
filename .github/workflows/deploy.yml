@@ -8,6 +8,7 @@ on:
     paths:
       - ".github/workflows/deploy.yml"
       - "cmd/**"
+      - "frontend/**"
       - "internal/**"
       - "deploy/docker/**"
       - "deploy/k8s/**"

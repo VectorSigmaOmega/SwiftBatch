@@ -437,7 +437,11 @@ export function HomePage() {
                 type="button"
                 onClick={handleReset}
                 className="rounded-md px-4 py-1.5 text-[12px] transition-colors"
-                style={{ border: "1px solid oklch(94% 0.018 80 / 0.15)", color: TEXT }}
+                style={{
+                  background: SURF_HI,
+                  border: "1px solid oklch(75% 0.16 50 / 0.5)",
+                  color: TEXT,
+                }}
               >
                 Run another
               </button>
@@ -459,23 +463,6 @@ export function HomePage() {
             )}
           </div>
         </div>
-
-        {pipeline.banner && (
-          <div
-            className="mt-4 rounded-md px-3 py-2"
-            style={{
-              border: `1px solid ${pipeline.banner.tone === "ok" ? "oklch(75% 0.16 50 / 0.28)" : "oklch(70% 0.18 30 / 0.32)"}`,
-              background:
-                pipeline.banner.tone === "ok"
-                  ? "oklch(75% 0.16 50 / 0.08)"
-                  : "oklch(70% 0.18 30 / 0.08)",
-            }}
-          >
-            <span style={mono(10, pipeline.banner.tone === "ok" ? TEXT : ACCENT_DEEP)}>
-              {pipeline.banner.message}
-            </span>
-          </div>
-        )}
 
         <div className="mt-auto" style={{ color: TEXT }}>
           <SiteFooter />
@@ -644,41 +631,46 @@ function Running({ items, summary }: { items: BatchItem[]; summary: BatchSummary
   return (
     <div
       className="flex h-full w-full flex-col overflow-hidden rounded-md"
-      style={{ background: SURF, border: `1px solid ${RULE}`, padding: PANEL_PADDING }}
+      style={{
+        animation: summary.terminal ? "completionGlow 2000ms ease-out 1" : "none",
+        background: SURF,
+        border: `1px dashed ${RULE}`,
+        padding: PANEL_PADDING,
+      }}
     >
-      <div className="grid min-h-[62px] grid-rows-[auto,auto]">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span
-              className="inline-block h-1.5 w-1.5 rounded-full"
-              style={{
-                background: summary.failedCount > 0 ? ACCENT_DEEP : ACCENT,
-                boxShadow: `0 0 8px ${summary.failedCount > 0 ? ACCENT_DEEP : ACCENT}`,
-                animation: summary.terminal ? "none" : "designPulse 1.4s ease-in-out infinite",
-              }}
-            />
-            <span style={mono(10, TEXT)}>{summary.label}</span>
+      <div className="flex min-h-[24px] items-center">
+        <div className="min-w-0">
+          <div
+            className="truncate text-[18px]"
+            style={{
+              fontFamily: "'Fraunces', serif",
+              fontStyle: "italic",
+              fontWeight: 300,
+              color: TEXT,
+            }}
+          >
+            {summary.label}
           </div>
-          <span style={mono(10, FAINT)}>
-            {summary.completedCount}/{summary.totalCount}
-          </span>
-        </div>
-        <div className="mt-3 grid grid-cols-6 gap-1 self-start">
-          {STATUS_SEQUENCE.map((status, index) => {
-            const active = index <= summary.stageIndex;
-            return (
-              <div
-                key={status}
-                className="h-[3px] rounded-full"
-                style={{
-                  background: active ? ACCENT : "oklch(94% 0.018 80 / 0.1)",
-                  transition: "background 200ms",
-                }}
-              />
-            );
-          })}
+          <div className="mt-1 flex h-[15px] items-center">
+            <div className="grid w-full grid-cols-6 gap-1">
+              {STATUS_SEQUENCE.map((status, index) => {
+                const active = index <= summary.stageIndex;
+                return (
+                  <div
+                    key={status}
+                    className="h-[3px] rounded-full"
+                    style={{
+                      background: active ? ACCENT : "oklch(94% 0.018 80 / 0.1)",
+                      transition: "background 200ms",
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
+
       <div className="mt-3 min-h-0 overflow-hidden">
         <div className="styled-scrollbar h-full overflow-y-scroll overflow-x-hidden pr-2">
           <div className="flex flex-wrap content-start gap-3">
@@ -687,7 +679,7 @@ function Running({ items, summary }: { items: BatchItem[]; summary: BatchSummary
                 key={item.clientID}
                 src={item.previewURL}
                 alt={item.fileName}
-                className="h-20 w-20 rounded-md object-cover"
+                className="h-16 w-16 rounded-md object-cover"
                 style={{
                   border: `1px solid ${
                     isFailureStatus(item.status)
@@ -702,7 +694,6 @@ function Running({ items, summary }: { items: BatchItem[]; summary: BatchSummary
           </div>
         </div>
       </div>
-      <style>{`@keyframes designPulse { 0%,100%{ opacity:0.4 } 50%{ opacity:1 } }`}</style>
     </div>
   );
 }
@@ -711,10 +702,23 @@ function ResultStrip({ outputs }: { outputs: DisplayOutput[] }) {
   return (
     <div
       className="flex h-full w-full flex-col overflow-hidden rounded-md"
-      style={{ background: SURF, border: `1px solid ${RULE}`, padding: PANEL_PADDING }}
+      style={{
+        animation: "completionGlow 2000ms ease-out 1",
+        background: SURF,
+        border: `1px dashed ${RULE}`,
+        padding: PANEL_PADDING,
+      }}
     >
       <div className="flex items-baseline justify-between gap-4">
-        <span className="text-[14px]" style={{ fontFamily: "'Fraunces', serif", color: TEXT }}>
+        <span
+          className="text-[18px]"
+          style={{
+            fontFamily: "'Fraunces', serif",
+            fontStyle: "italic",
+            fontWeight: 300,
+            color: TEXT,
+          }}
+        >
           {outputs.length} outputs ready.
         </span>
         <span style={mono(10, FAINT)}>presigned downloads</span>

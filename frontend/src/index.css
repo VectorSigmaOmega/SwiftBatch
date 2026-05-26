@@ -32,6 +32,23 @@
   }
 }
 
+@keyframes completionGlow {
+  0% {
+    border-color: oklch(94% 0.018 80 / 0.08);
+    box-shadow: none;
+  }
+
+  30% {
+    border-color: oklch(75% 0.16 50 / 0.7);
+    box-shadow: 0 0 32px oklch(75% 0.16 50 / 0.28);
+  }
+
+  100% {
+    border-color: oklch(94% 0.018 80 / 0.08);
+    box-shadow: none;
+  }
+}
+
 @layer components {
   .hero-mark-enter {
     opacity: 0;

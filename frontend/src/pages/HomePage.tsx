@@ -630,18 +630,17 @@ function Drop({
 function Running({ items, summary }: { items: BatchItem[]; summary: BatchSummary }) {
   return (
     <div
-      className="flex h-full w-full flex-col overflow-hidden rounded-md"
+      className={`flex h-full w-full flex-col overflow-hidden rounded-md ${summary.terminal ? "completion-glow-panel" : ""}`}
       style={{
-        animation: summary.terminal ? "completionGlow 2000ms ease-out 1" : "none",
         background: SURF,
         border: `1px dashed ${RULE}`,
         padding: PANEL_PADDING,
       }}
     >
-      <div className="flex min-h-[24px] items-center">
-        <div className="min-w-0">
+      <div className="w-full min-h-[39px]">
+        <div className="flex min-h-[24px] items-center">
           <div
-            className="truncate text-[18px]"
+            className="text-[18px]"
             style={{
               fontFamily: "'Fraunces', serif",
               fontStyle: "italic",
@@ -651,22 +650,22 @@ function Running({ items, summary }: { items: BatchItem[]; summary: BatchSummary
           >
             {summary.label}
           </div>
-          <div className="mt-1 flex h-[15px] items-center">
-            <div className="grid w-full grid-cols-6 gap-1">
-              {STATUS_SEQUENCE.map((status, index) => {
-                const active = index <= summary.stageIndex;
-                return (
-                  <div
-                    key={status}
-                    className="h-[3px] rounded-full"
-                    style={{
-                      background: active ? ACCENT : "oklch(94% 0.018 80 / 0.1)",
-                      transition: "background 200ms",
-                    }}
-                  />
-                );
-              })}
-            </div>
+        </div>
+        <div className="mt-1 flex h-[15px] items-center">
+          <div className="grid w-full grid-cols-6 gap-1">
+            {STATUS_SEQUENCE.map((status, index) => {
+              const active = index <= summary.stageIndex;
+              return (
+                <div
+                  key={status}
+                  className="h-[3px] rounded-full"
+                  style={{
+                    background: active ? ACCENT : "oklch(94% 0.018 80 / 0.1)",
+                    transition: "background 200ms",
+                  }}
+                />
+              );
+            })}
           </div>
         </div>
       </div>
@@ -701,9 +700,8 @@ function Running({ items, summary }: { items: BatchItem[]; summary: BatchSummary
 function ResultStrip({ outputs }: { outputs: DisplayOutput[] }) {
   return (
     <div
-      className="flex h-full w-full flex-col overflow-hidden rounded-md"
+      className="completion-glow-panel flex h-full w-full flex-col overflow-hidden rounded-md"
       style={{
-        animation: "completionGlow 2000ms ease-out 1",
         background: SURF,
         border: `1px dashed ${RULE}`,
         padding: PANEL_PADDING,

@@ -34,17 +34,19 @@
 
 @keyframes completionGlow {
   0% {
-    border-color: oklch(94% 0.018 80 / 0.08);
+    border-color: transparent;
     box-shadow: none;
   }
 
   30% {
-    border-color: oklch(75% 0.16 50 / 0.7);
-    box-shadow: 0 0 32px oklch(75% 0.16 50 / 0.28);
+    border-color: oklch(75% 0.16 50 / 0.9);
+    box-shadow:
+      inset 0 0 0 1px oklch(75% 0.16 50 / 0.65),
+      0 0 32px oklch(75% 0.16 50 / 0.28);
   }
 
   100% {
-    border-color: oklch(94% 0.018 80 / 0.08);
+    border-color: transparent;
     box-shadow: none;
   }
 }
@@ -82,6 +84,20 @@
 
   .styled-scrollbar::-webkit-scrollbar-thumb:hover {
     background: oklch(75% 0.16 50 / 0.56);
+  }
+
+  .completion-glow-panel {
+    position: relative;
+  }
+
+  .completion-glow-panel::after {
+    animation: completionGlow 2000ms ease-out 1;
+    border: 1px solid transparent;
+    border-radius: inherit;
+    content: "";
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
   }
 }
 

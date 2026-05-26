@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { SiteFooter } from "../components/SiteFooter";
+import { downloadOutputsArchive } from "../lib/downloadArchive";
 import { formatBytes } from "../lib/format";
 import { TRANSFORMS, type OutputFormat } from "../lib/transforms";
 import type { BatchItem, ClientStatus, JobOutput, Transform } from "../lib/types";
@@ -698,6 +699,35 @@ function Running({ items, summary }: { items: BatchItem[]; summary: BatchSummary
 }
 
 function ResultStrip({ outputs }: { outputs: DisplayOutput[] }) {
+  const [isDownloadingArchive, setIsDownloadingArchive] = useState(false);
+  const autoDownloadKeyRef = useRef("");
+  const outputsKey = useMemo(
+    () => outputs.map((output) => `${output.job_id}-${output.id}`).join("|"),
+    [outputs],
+  );
+
+  const handleDownloadAll = useCallback(async () => {
+    if (outputs.length === 0) return;
+
+    setIsDownloadingArchive(true);
+    try {
+      await downloadOutputsArchive(outputs);
+    } finally {
+      setIsDownloadingArchive(false);
+    }
+  }, [outputs]);
+
+  useEffect(() => {
+    if (outputsKey === "" || autoDownloadKeyRef.current === outputsKey) {
+      return;
+    }
+
+    autoDownloadKeyRef.current = outputsKey;
+    void handleDownloadAll().catch((error) => {
+      console.error("download outputs archive", error);
+    });
+  }, [handleDownloadAll, outputsKey]);
+
   return (
     <div
       className="completion-glow-panel flex h-full w-full flex-col overflow-hidden rounded-md"
@@ -719,7 +749,19 @@ function ResultStrip({ outputs }: { outputs: DisplayOutput[] }) {
         >
           {outputs.length} outputs ready.
         </span>
-        <span style={mono(10, FAINT)}>presigned downloads</span>
+        <button
+          type="button"
+          onClick={() => void handleDownloadAll()}
+          disabled={isDownloadingArchive}
+          className="rounded-md px-3 py-1 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+          style={{
+            background: SURF_HI,
+            border: `1px solid oklch(75% 0.16 50 / 0.35)`,
+            ...mono(10, isDownloadingArchive ? MUTE : ACCENT),
+          }}
+        >
+          {isDownloadingArchive ? "zipping..." : "download all .zip"}
+        </button>
       </div>
       <div className="mt-3 min-h-0 overflow-hidden">
         <div className="styled-scrollbar h-full overflow-y-scroll overflow-x-hidden pr-2">

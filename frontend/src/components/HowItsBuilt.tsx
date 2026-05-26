@@ -14,7 +14,7 @@ export function HowItsBuilt() {
           How it&apos;s built
         </h2>
         <a
-          href="https://github.com/VectorSigmaOmega/SwiftBatch"
+          href="https://github.com/VectorSigmaOmega/Photon"
           target="_blank"
           rel="noreferrer"
           className="text-sm text-ink-soft underline-offset-4 hover:text-signal hover:underline"

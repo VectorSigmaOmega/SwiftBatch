@@ -21,8 +21,6 @@ The current public names are:
 - `grafana.photon.abhinash.dev`
 - `swiftbatch.abhinash.dev` (legacy homepage redirect)
 
-The product has been renamed to `Photon`. The old `swiftbatch.abhinash.dev` homepage host is retained only as a redirect to the new site.
-
 If a future note says "update DNS", it means:
 
 - add or update `A` records in the Lightsail DNS zone shown in the AWS console
@@ -34,23 +32,23 @@ The server should now be accessed through the `deploy` user with a dedicated SSH
 Expected login pattern:
 
 ```bash
-ssh -i ~/.ssh/swiftbatch_skyserver_ed25519 deploy@161.248.163.187
+ssh -i ~/.ssh/photon_skyserver_ed25519 deploy@161.248.163.187
 ```
 
 Useful convenience entry for `~/.ssh/config`:
 
 ```sshconfig
-Host swiftbatch-skyserver
+Host photon-skyserver
     HostName 161.248.163.187
     User deploy
-    IdentityFile ~/.ssh/swiftbatch_skyserver_ed25519
+    IdentityFile ~/.ssh/photon_skyserver_ed25519
     IdentitiesOnly yes
 ```
 
 Then login becomes:
 
 ```bash
-ssh swiftbatch-skyserver
+ssh photon-skyserver
 ```
 
 ## Hardening Performed
@@ -85,7 +83,7 @@ The intended current posture is:
 ## Important Operational Notes
 
 - The root password that was used for first access should be considered temporary and effectively burned once exposed in setup history.
-- The dedicated SSH key at `~/.ssh/swiftbatch_skyserver_ed25519` is now part of the server access path and should be retained carefully.
+- The dedicated SSH key at `~/.ssh/photon_skyserver_ed25519` is now part of the server access path and should be retained carefully.
 - If CI/CD later deploys by SSH, it should target the `deploy` user, not `root`.
 
 ## Kubernetes Access
@@ -101,7 +99,7 @@ The working kubeconfig path on the box is:
 Examples:
 
 ```bash
-ssh swiftbatch-skyserver
+ssh photon-skyserver
 kubectl --kubeconfig=/home/deploy/.kube/config get nodes -o wide
 kubectl --kubeconfig=/home/deploy/.kube/config get pods -A
 ```

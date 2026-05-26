@@ -57,8 +57,8 @@ docker save photon-migrate:latest | sudo k3s ctr images import -
 
 Edit these files first:
 
-- [config.yaml](/home/dell/dev/Carousell/SwiftBatch/deploy/k8s/config.yaml)
-- [ingress.yaml](/home/dell/dev/Carousell/SwiftBatch/deploy/k8s/ingress.yaml)
+- [config.yaml](config.yaml)
+- [ingress.yaml](ingress.yaml)
 
 The repo is currently prewired for these hosts:
 
@@ -66,8 +66,9 @@ The repo is currently prewired for these hosts:
 - `storage.photon.abhinash.dev`
 - `minio.photon.abhinash.dev`
 - `grafana.photon.abhinash.dev`
+- `swiftbatch.abhinash.dev` (legacy redirect to `photon.abhinash.dev`)
 
-If those change later, update both [config.yaml](/home/dell/dev/Carousell/SwiftBatch/deploy/k8s/config.yaml) and [ingress.yaml](/home/dell/dev/Carousell/SwiftBatch/deploy/k8s/ingress.yaml). Keep `PHOTON_STORAGE_PUBLIC_BASE_URL` aligned with the MinIO object ingress host.
+If those change later, update both [config.yaml](config.yaml) and [ingress.yaml](ingress.yaml). Keep `PHOTON_STORAGE_PUBLIC_BASE_URL` aligned with the MinIO object ingress host.
 
 ## Deploy
 
@@ -111,7 +112,7 @@ Because the published GHCR images are currently public, the cluster does not nee
 
 ## TLS Note
 
-The repo now includes [traefik-config.yaml](/home/dell/dev/Carousell/SwiftBatch/deploy/k8s/traefik-config.yaml), which adds a `HelmChartConfig` for the bundled `k3s` Traefik install:
+The repo now includes [traefik-config.yaml](traefik-config.yaml), which adds a `HelmChartConfig` for the bundled `k3s` Traefik install:
 
 - persistent ACME storage at `/data/acme.json`
 - Let's Encrypt HTTP-01 certificate issuance

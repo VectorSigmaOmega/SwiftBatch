@@ -75,7 +75,7 @@ If the repo or packages are made private later, a cluster pull credential will n
 
 The server-side entry point is:
 
-- [scripts/deploy-k8s.sh](/home/dell/dev/Carousell/SwiftBatch/scripts/deploy-k8s.sh)
+- [scripts/deploy-k8s.sh](../scripts/deploy-k8s.sh)
 
 That script expects the deployment environment variables to already be present. The GitHub Actions deploy workflow sets them before invoking the script remotely.
 

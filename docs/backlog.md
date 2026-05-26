@@ -38,12 +38,7 @@ Remaining after that:
 - architecture diagram
 - demo instructions
 - frontend polish and `Engineering` page
-- external Photon rename migration:
-  - GitHub repo renamed from `SwiftBatch` to `Photon`
-  - sweep remaining public repository links after the repo rename
-  - rename GitHub Actions variables/secrets from `SWIFTBATCH_*` to `PHOTON_*`
-  - migrate live DNS/ingress from `swiftbatch.abhinash.dev` hosts to `photon.abhinash.dev` hosts
-  - rename the local SSH alias and server ops references once the live hostnames are migrated
+- optionally rename the local checkout directory to match the product name so generated absolute paths stop carrying the old repo name
 
 Footnote:
 

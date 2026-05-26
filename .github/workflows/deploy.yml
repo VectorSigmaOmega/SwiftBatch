@@ -117,7 +117,15 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' '${{ secrets.PHOTON_DEPLOY_SSH_PRIVATE_KEY || secrets.SWIFTBATCH_DEPLOY_SSH_PRIVATE_KEY }}' > ~/.ssh/photon_deploy_key
           chmod 600 ~/.ssh/photon_deploy_key
-          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          for attempt in 1 2 3 4 5; do
+            if ssh-keyscan -T 15 -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts; then
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              exit 1
+            fi
+            sleep 5
+          done
 
       - name: Upload deployment bundle
         shell: bash

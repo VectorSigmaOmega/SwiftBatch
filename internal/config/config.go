@@ -85,42 +85,83 @@ type StorageConfig struct {
 }
 
 func Load(service string) (Config, error) {
+	var parseErr error
+	readInt := func(key string, fallback int) int {
+		if parseErr != nil {
+			return fallback
+		}
+
+		value, err := intFromEnv(key, fallback)
+		if err != nil {
+			parseErr = err
+			return fallback
+		}
+
+		return value
+	}
+	readBool := func(key string, fallback bool) bool {
+		if parseErr != nil {
+			return fallback
+		}
+
+		value, err := boolFromEnv(key, fallback)
+		if err != nil {
+			parseErr = err
+			return fallback
+		}
+
+		return value
+	}
+	readDuration := func(key string, fallback time.Duration) time.Duration {
+		if parseErr != nil {
+			return fallback
+		}
+
+		value, err := durationFromEnv(key, fallback)
+		if err != nil {
+			parseErr = err
+			return fallback
+		}
+
+		return value
+	}
+
 	cfg := Config{
 		AppName: fmt.Sprintf("photon-%s", service),
 		Env:     getEnv("PHOTON_ENV", "development"),
 		API: HTTPServerConfig{
 			Addr: getEnv("PHOTON_API_ADDR", ":8080"),
 			RateLimit: HTTPRateLimitConfig{
-				Enabled:                  getBool("PHOTON_API_RATE_LIMIT_ENABLED", true),
-				ClientTTL:                getDuration("PHOTON_API_RATE_LIMIT_CLIENT_TTL", 30*time.Minute),
-				PresignBurst:             getInt("PHOTON_API_PRESIGN_RATE_LIMIT_BURST", 5),
-				PresignRequestsPerMinute: getInt("PHOTON_API_PRESIGN_RATE_LIMIT_PER_MINUTE", 20),
-				CreateBurst:              getInt("PHOTON_API_JOBS_CREATE_RATE_LIMIT_BURST", 10),
-				CreateRequestsPerMinute:  getInt("PHOTON_API_JOBS_CREATE_RATE_LIMIT_PER_MINUTE", 30),
-				RetryBurst:               getInt("PHOTON_API_JOBS_RETRY_RATE_LIMIT_BURST", 2),
-				RetryRequestsPerMinute:   getInt("PHOTON_API_JOBS_RETRY_RATE_LIMIT_PER_MINUTE", 6),
+				Enabled:                  readBool("PHOTON_API_RATE_LIMIT_ENABLED", true),
+				ClientTTL:                readDuration("PHOTON_API_RATE_LIMIT_CLIENT_TTL", 30*time.Minute),
+				PresignBurst:             readInt("PHOTON_API_PRESIGN_RATE_LIMIT_BURST", 5),
+				PresignRequestsPerMinute: readInt("PHOTON_API_PRESIGN_RATE_LIMIT_PER_MINUTE", 20),
+				CreateBurst:              readInt("PHOTON_API_JOBS_CREATE_RATE_LIMIT_BURST", 10),
+				CreateRequestsPerMinute:  readInt("PHOTON_API_JOBS_CREATE_RATE_LIMIT_PER_MINUTE", 30),
+				RetryBurst:               readInt("PHOTON_API_JOBS_RETRY_RATE_LIMIT_BURST", 2),
+				RetryRequestsPerMinute:   readInt("PHOTON_API_JOBS_RETRY_RATE_LIMIT_PER_MINUTE", 6),
 			},
-			ReadTimeout:     getDuration("PHOTON_API_READ_TIMEOUT", 10*time.Second),
-			WriteTimeout:    getDuration("PHOTON_API_WRITE_TIMEOUT", 15*time.Second),
-			ShutdownTimeout: getDuration("PHOTON_API_SHUTDOWN_TIMEOUT", 10*time.Second),
+			ReadTimeout:     readDuration("PHOTON_API_READ_TIMEOUT", 10*time.Second),
+			WriteTimeout:    readDuration("PHOTON_API_WRITE_TIMEOUT", 15*time.Second),
+			ShutdownTimeout: readDuration("PHOTON_API_SHUTDOWN_TIMEOUT", 10*time.Second),
 		},
 		Worker: WorkerConfig{
-			Concurrency: getInt("PHOTON_WORKER_CONCURRENCY", 4),
-			JobTimeout:  getDuration("PHOTON_WORKER_JOB_TIMEOUT", 2*time.Minute),
+			Concurrency: readInt("PHOTON_WORKER_CONCURRENCY", 4),
+			JobTimeout:  readDuration("PHOTON_WORKER_JOB_TIMEOUT", 2*time.Minute),
 			MetricsAddr: getEnv("PHOTON_WORKER_METRICS_ADDR", ":8081"),
-			PollTimeout: getDuration("PHOTON_WORKER_POLL_TIMEOUT", 5*time.Second),
+			PollTimeout: readDuration("PHOTON_WORKER_POLL_TIMEOUT", 5*time.Second),
 		},
 		Cleanup: CleanupConfig{
-			BatchSize:     getInt("PHOTON_CLEANUP_BATCH_SIZE", 50),
-			DLQRetention:  getDuration("PHOTON_CLEANUP_DLQ_RETENTION", 168*time.Hour),
-			Enabled:       getBool("PHOTON_CLEANUP_ENABLED", true),
-			Interval:      getDuration("PHOTON_CLEANUP_INTERVAL", 6*time.Hour),
-			JobRetention:  getDuration("PHOTON_CLEANUP_JOB_RETENTION", 168*time.Hour),
-			StartupJitter: getDuration("PHOTON_CLEANUP_STARTUP_JITTER", 0),
+			BatchSize:     readInt("PHOTON_CLEANUP_BATCH_SIZE", 50),
+			DLQRetention:  readDuration("PHOTON_CLEANUP_DLQ_RETENTION", 168*time.Hour),
+			Enabled:       readBool("PHOTON_CLEANUP_ENABLED", true),
+			Interval:      readDuration("PHOTON_CLEANUP_INTERVAL", 6*time.Hour),
+			JobRetention:  readDuration("PHOTON_CLEANUP_JOB_RETENTION", 168*time.Hour),
+			StartupJitter: readDuration("PHOTON_CLEANUP_STARTUP_JITTER", 0),
 		},
 		Postgres: PostgresConfig{
 			Host:     getEnv("PHOTON_POSTGRES_HOST", "localhost"),
-			Port:     getInt("PHOTON_POSTGRES_PORT", 5432),
+			Port:     readInt("PHOTON_POSTGRES_PORT", 5432),
 			User:     getEnv("PHOTON_POSTGRES_USER", "photon"),
 			Password: getEnv("PHOTON_POSTGRES_PASSWORD", "photon"),
 			Database: getEnv("PHOTON_POSTGRES_DB", "photon"),
@@ -129,10 +170,10 @@ func Load(service string) (Config, error) {
 		Redis: RedisConfig{
 			Addr:       getEnv("PHOTON_REDIS_ADDR", "localhost:6379"),
 			Password:   getEnv("PHOTON_REDIS_PASSWORD", ""),
-			DB:         getInt("PHOTON_REDIS_DB", 0),
+			DB:         readInt("PHOTON_REDIS_DB", 0),
 			QueueKey:   getEnv("PHOTON_REDIS_QUEUE_KEY", "photon:jobs"),
 			DLQKey:     getEnv("PHOTON_REDIS_DLQ_KEY", "photon:jobs:dlq"),
-			MaxRetries: getInt("PHOTON_REDIS_MAX_RETRIES", 3),
+			MaxRetries: readInt("PHOTON_REDIS_MAX_RETRIES", 3),
 		},
 		Storage: StorageConfig{
 			Endpoint:           getEnv("PHOTON_STORAGE_ENDPOINT", "localhost:9000"),
@@ -141,14 +182,22 @@ func Load(service string) (Config, error) {
 			SecretKey:          getEnv("PHOTON_STORAGE_SECRET_KEY", "minioadmin"),
 			Bucket:             getEnv("PHOTON_STORAGE_BUCKET", "photon"),
 			Region:             getEnv("PHOTON_STORAGE_REGION", "us-east-1"),
-			UseSSL:             getBool("PHOTON_STORAGE_USE_SSL", false),
-			UploadPresignTTL:   getDuration("PHOTON_STORAGE_UPLOAD_URL_TTL", 15*time.Minute),
-			DownloadPresignTTL: getDuration("PHOTON_STORAGE_DOWNLOAD_URL_TTL", 30*time.Minute),
+			UseSSL:             readBool("PHOTON_STORAGE_USE_SSL", false),
+			UploadPresignTTL:   readDuration("PHOTON_STORAGE_UPLOAD_URL_TTL", 15*time.Minute),
+			DownloadPresignTTL: readDuration("PHOTON_STORAGE_DOWNLOAD_URL_TTL", 30*time.Minute),
 		},
+	}
+
+	if parseErr != nil {
+		return Config{}, parseErr
 	}
 
 	if cfg.Worker.Concurrency <= 0 {
 		return Config{}, fmt.Errorf("PHOTON_WORKER_CONCURRENCY must be greater than zero")
+	}
+
+	if cfg.Worker.JobTimeout <= 0 {
+		return Config{}, fmt.Errorf("PHOTON_WORKER_JOB_TIMEOUT must be greater than zero")
 	}
 
 	if cfg.Cleanup.BatchSize <= 0 {
@@ -179,6 +228,18 @@ func Load(service string) (Config, error) {
 		return Config{}, fmt.Errorf("PHOTON_REDIS_DLQ_KEY must not be empty")
 	}
 
+	if cfg.Redis.MaxRetries <= 0 {
+		return Config{}, fmt.Errorf("PHOTON_REDIS_MAX_RETRIES must be greater than zero")
+	}
+
+	if cfg.Storage.UploadPresignTTL <= 0 {
+		return Config{}, fmt.Errorf("PHOTON_STORAGE_UPLOAD_URL_TTL must be greater than zero")
+	}
+
+	if cfg.Storage.DownloadPresignTTL <= 0 {
+		return Config{}, fmt.Errorf("PHOTON_STORAGE_DOWNLOAD_URL_TTL must be greater than zero")
+	}
+
 	return cfg, nil
 }
 
@@ -202,44 +263,44 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func getInt(key string, fallback int) int {
+func intFromEnv(key string, fallback int) (int, error) {
 	value := strings.TrimSpace(getEnv(key, ""))
 	if value == "" {
-		return fallback
+		return fallback, nil
 	}
 
 	parsed, err := strconv.Atoi(value)
 	if err != nil {
-		return fallback
+		return 0, fmt.Errorf("%s must be a valid integer: %w", key, err)
 	}
 
-	return parsed
+	return parsed, nil
 }
 
-func getBool(key string, fallback bool) bool {
+func boolFromEnv(key string, fallback bool) (bool, error) {
 	value := strings.TrimSpace(getEnv(key, ""))
 	if value == "" {
-		return fallback
+		return fallback, nil
 	}
 
 	parsed, err := strconv.ParseBool(value)
 	if err != nil {
-		return fallback
+		return false, fmt.Errorf("%s must be a valid boolean: %w", key, err)
 	}
 
-	return parsed
+	return parsed, nil
 }
 
-func getDuration(key string, fallback time.Duration) time.Duration {
+func durationFromEnv(key string, fallback time.Duration) (time.Duration, error) {
 	value := strings.TrimSpace(getEnv(key, ""))
 	if value == "" {
-		return fallback
+		return fallback, nil
 	}
 
 	parsed, err := time.ParseDuration(value)
 	if err != nil {
-		return fallback
+		return 0, fmt.Errorf("%s must be a valid duration: %w", key, err)
 	}
 
-	return parsed
+	return parsed, nil
 }

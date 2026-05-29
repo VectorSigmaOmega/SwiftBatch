@@ -193,8 +193,69 @@ func (r *JobsRepository) ReplaceJobOutputs(ctx context.Context, jobID string, ou
 		return err
 	}
 
-	if _, err := tx.ExecContext(ctx, `DELETE FROM job_outputs WHERE job_id = $1`, jobID); err != nil {
+	if err := replaceJobOutputsTx(ctx, tx, jobID, outputs); err != nil {
 		_ = tx.Rollback()
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *JobsRepository) CompleteJobAttemptWithOutputs(
+	ctx context.Context,
+	id string,
+	attemptNumber int,
+	outputs []ReplaceJobOutputsInput,
+) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	job, err := getJobForUpdate(ctx, tx, id)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if job.Status != JobStatusProcessing {
+		_ = tx.Rollback()
+		return ErrInvalidJobStatus
+	}
+
+	if err := replaceJobOutputsTx(ctx, tx, id, outputs); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if err := finishAttemptRecord(ctx, tx, id, attemptNumber, JobStatusCompleted, ""); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if _, err := updateJobState(ctx, tx, id, JobStatusCompleted, ""); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func replaceJobOutputsTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	jobID string,
+	outputs []ReplaceJobOutputsInput,
+) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM job_outputs WHERE job_id = $1`, jobID); err != nil {
 		return err
 	}
 
@@ -213,13 +274,8 @@ VALUES ($1, $2, $3, $4, $5)
 			output.ContentType,
 			output.SizeBytes,
 		); err != nil {
-			_ = tx.Rollback()
 			return err
 		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return err
 	}
 
 	return nil
@@ -247,6 +303,10 @@ WHERE id = $1
 	}
 
 	return nil
+}
+
+func (r *JobsRepository) MarkJobFailedIfQueued(ctx context.Context, id, reason string) error {
+	return r.updateJobStateIfCurrentStatus(ctx, id, JobStatusQueued, JobStatusFailed, reason)
 }
 
 func (r *JobsRepository) ResetJobToQueued(ctx context.Context, id string) (Job, error) {
@@ -373,6 +433,89 @@ func (r *JobsRepository) RequeueJobAfterFailure(ctx context.Context, id string, 
 
 func (r *JobsRepository) DeadLetterJob(ctx context.Context, id string, attemptNumber int, reason string) error {
 	return r.finishJobAttempt(ctx, id, attemptNumber, JobStatusDeadLettered, reason)
+}
+
+func (r *JobsRepository) RecoverStaleProcessingJobs(
+	ctx context.Context,
+	cutoff time.Time,
+	limit int,
+	reason string,
+) ([]string, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	const query = `
+SELECT j.id, a.attempt_number
+FROM jobs j
+JOIN job_attempts a
+  ON a.job_id = j.id
+ AND a.status = $2
+WHERE j.status = $2
+  AND a.started_at < $1
+ORDER BY a.started_at ASC
+LIMIT $3
+FOR UPDATE OF j SKIP LOCKED
+`
+
+	rows, err := tx.QueryContext(ctx, query, cutoff, JobStatusProcessing, limit)
+	if err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	type staleAttempt struct {
+		jobID         string
+		attemptNumber int
+	}
+
+	stale := make([]staleAttempt, 0, limit)
+	for rows.Next() {
+		var attempt staleAttempt
+		if err := rows.Scan(&attempt.jobID, &attempt.attemptNumber); err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+
+		stale = append(stale, attempt)
+	}
+
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	if err := rows.Close(); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	recovered := make([]string, 0, len(stale))
+	for _, attempt := range stale {
+		if err := finishAttemptRecord(ctx, tx, attempt.jobID, attempt.attemptNumber, JobStatusFailed, reason); err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+
+		if _, err := updateJobState(ctx, tx, attempt.jobID, JobStatusQueued, ""); err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+
+		recovered = append(recovered, attempt.jobID)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return recovered, nil
 }
 
 func (r *JobsRepository) finishJobAttempt(
@@ -551,4 +694,40 @@ RETURNING id, status, source_object_key, requested_transforms, output_format, CO
 	}
 
 	return job, err
+}
+
+func (r *JobsRepository) updateJobStateIfCurrentStatus(
+	ctx context.Context,
+	id string,
+	currentStatus JobStatus,
+	nextStatus JobStatus,
+	reason string,
+) error {
+	const query = `
+UPDATE jobs
+SET status = $3,
+	failure_reason = NULLIF($4, ''),
+	updated_at = NOW()
+WHERE id = $1 AND status = $2
+`
+
+	result, err := r.db.ExecContext(ctx, query, id, currentStatus, nextStatus, reason)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected > 0 {
+		return nil
+	}
+
+	if _, err := r.GetJob(ctx, id); err != nil {
+		return err
+	}
+
+	return ErrInvalidJobStatus
 }

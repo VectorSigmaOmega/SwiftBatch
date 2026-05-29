@@ -20,6 +20,12 @@ import (
 	"github.com/VectorSigmaOmega/photon/internal/storage"
 )
 
+const (
+	staleRecoveryBatchSize = 100
+	staleRecoveryInterval  = 30 * time.Second
+	staleRecoveryReason    = "worker lease expired before completion"
+)
+
 type Runner struct {
 	cfg        config.WorkerConfig
 	jobs       *dbrepo.JobsRepository
@@ -72,6 +78,8 @@ func (r *Runner) Run(ctx context.Context) error {
 		r.metrics.SetConcurrencyInUse(0)
 	}
 	go r.pollQueueMetrics(ctx)
+	go r.recoverStaleJobsLoop(ctx)
+	r.recoverStaleJobs(ctx)
 
 	for {
 		select {
@@ -155,15 +163,8 @@ func (r *Runner) processJob(jobID string) error {
 		return r.handleProcessingFailure(ctx, jobLog, job, attempt.AttemptNumber, startedAt, err)
 	}
 
-	if err := r.jobs.ReplaceJobOutputs(ctx, job.ID, outputs); err != nil {
-		return r.handleProcessingFailure(ctx, jobLog, job, attempt.AttemptNumber, startedAt, fmt.Errorf("persist outputs: %w", err))
-	}
-
-	if err := r.jobs.CompleteJobAttempt(ctx, job.ID, attempt.AttemptNumber); err != nil {
-		if r.metrics != nil {
-			r.metrics.ObserveProcessingDuration("state_update_failed", time.Since(startedAt))
-		}
-		return err
+	if err := r.jobs.CompleteJobAttemptWithOutputs(ctx, job.ID, attempt.AttemptNumber, outputs); err != nil {
+		return r.handleProcessingFailure(ctx, jobLog, job, attempt.AttemptNumber, startedAt, fmt.Errorf("persist completion: %w", err))
 	}
 
 	if r.metrics != nil {
@@ -274,7 +275,21 @@ func (r *Runner) handleProcessingFailure(
 	}
 
 	if err := r.queue.Enqueue(ctx, job.ID); err != nil {
-		return fmt.Errorf("processing failed: %w; requeue job: %v", processErr, err)
+		compensationReason := fmt.Sprintf("%s; retry enqueue failed: %v", reason, err)
+		if compensateErr := r.jobs.MarkJobFailedIfQueued(ctx, job.ID, compensationReason); compensateErr != nil {
+			return fmt.Errorf("processing failed: %w; requeue job: %v; restore failed state: %v", processErr, err, compensateErr)
+		}
+
+		if r.metrics != nil {
+			r.metrics.IncJobOutcome(string(dbrepo.JobStatusFailed))
+			r.metrics.ObserveProcessingDuration(string(dbrepo.JobStatusFailed), time.Since(startedAt))
+		}
+
+		jobLog.Error(
+			"automatic retry enqueue failed; job left failed",
+			"retry_enqueue_err", err,
+		)
+		return nil
 	}
 
 	if r.metrics != nil {
@@ -288,6 +303,71 @@ func (r *Runner) handleProcessingFailure(
 		"err", processErr,
 	)
 	return nil
+}
+
+func (r *Runner) recoverStaleJobsLoop(ctx context.Context) {
+	ticker := time.NewTicker(staleRecoveryInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			r.recoverStaleJobs(ctx)
+		}
+	}
+}
+
+func (r *Runner) recoverStaleJobs(ctx context.Context) {
+	cutoff := time.Now().Add(-r.cfg.JobTimeout)
+
+	for {
+		recovered, err := r.jobs.RecoverStaleProcessingJobs(ctx, cutoff, staleRecoveryBatchSize, staleRecoveryReason)
+		if err != nil {
+			r.log.Warn("recover stale processing jobs", "err", err, "cutoff", cutoff.UTC().Format(time.RFC3339))
+			return
+		}
+
+		if len(recovered) == 0 {
+			return
+		}
+
+		for _, jobID := range recovered {
+			if err := r.queue.Enqueue(ctx, jobID); err != nil {
+				compensationReason := fmt.Sprintf("%s; recovery enqueue failed: %v", staleRecoveryReason, err)
+				if compensateErr := r.jobs.MarkJobFailedIfQueued(ctx, jobID, compensationReason); compensateErr != nil {
+					r.log.Error(
+						"requeue recovered job",
+						"job_id", jobID,
+						"err", err,
+						"compensate_err", compensateErr,
+					)
+					continue
+				}
+
+				if r.metrics != nil {
+					r.metrics.IncJobOutcome(string(dbrepo.JobStatusFailed))
+				}
+
+				r.log.Error(
+					"recovered job could not be re-enqueued; job left failed",
+					"job_id", jobID,
+					"err", err,
+				)
+				continue
+			}
+
+			r.log.Warn(
+				"recovered stale processing job",
+				"job_id", jobID,
+			)
+		}
+
+		if len(recovered) < staleRecoveryBatchSize {
+			return
+		}
+	}
 }
 
 func (r *Runner) pollQueueMetrics(ctx context.Context) {

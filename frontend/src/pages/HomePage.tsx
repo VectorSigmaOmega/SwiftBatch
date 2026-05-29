@@ -344,7 +344,7 @@ export function HomePage() {
             <em style={{ fontStyle: "italic", color: ACCENT, fontWeight: 300 }}>
               every variant
             </em>
-            <span style={{ color: MUTE }}> you need.</span>
+            <span> you need.</span>
           </h1>
         </div>
 

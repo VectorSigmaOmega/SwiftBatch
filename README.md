@@ -42,19 +42,19 @@ Browser / React UI
         |
         | presigned upload + job API
         v
-Photon API  -------------------->  PostgreSQL
-   |                                   |
-   | enqueue job ID                    | jobs, attempts, outputs
-   v                                   |
-Redis queue / DLQ                      |
-   |                                   |
-   | claim work                        |
-   v                                   |
+   Photon API  ----------------->  PostgreSQL
+        |                              |
+        | enqueue job ID               | jobs, attempts, outputs
+        v                              |
+ Redis queue / DLQ                     |
+        |                              |
+        | claim work                   |
+        v                              |
 Photon workers  -----------------------
-   |
-   | download source, generate variants, upload outputs
-   v
-MinIO object storage
+        |
+        | download source, generate variants, upload outputs
+        v
+ MinIO object storage
 ```
 
 The API and workers are separate deployable units. Workers can be scaled independently from the API, and the queue boundary keeps image processing off the latency-sensitive request path.

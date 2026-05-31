@@ -1,6 +1,17 @@
-# Photon
+<h1>
+  <img
+    src="https://github.com/user-attachments/assets/4899a7c5-272e-4f09-a6e4-4080a568668e"
+    alt="Guardian logo"
+    width="65"
+    align="center"
+  />
+  &nbsp;Photon
+</h1>
 
 Photon is an asynchronous, distributed, fault-tolerant image processing pipeline built as a production-style portfolio project.
+
+<img width="1035" height="931" alt="Screenshot 2026-05-31 222053" src="https://github.com/user-attachments/assets/3e666f34-ab22-45a4-95b2-bf21ba3a355e" />
+
 
 It accepts browser uploads, stores original images in object storage, creates durable jobs, pushes work through Redis, processes images in separate worker containers, stores generated outputs, exposes metrics, and deploys to a real VPS-backed `k3s` cluster through CI/CD.
 

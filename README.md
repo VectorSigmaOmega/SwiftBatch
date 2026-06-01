@@ -49,25 +49,21 @@ Photon is built to demonstrate the kind of engineering that sits between applica
 
 ## Architecture
 
-```text
-Browser / React UI
-        |
-        | presigned upload + job API
-        v
-   Photon API  ----------------->  PostgreSQL
-        |                              |
-        | enqueue job ID               | jobs, attempts, outputs
-        v                              |
- Redis queue / DLQ                     |
-        |                              |
-        | claim work                   |
-        v                              |
-Photon workers  -----------------------
-        |
-        | download source, generate variants, upload outputs
-        v
- MinIO object storage
-```
+
+<img width="711" height="361" alt="Photon-arch" src="https://github.com/user-attachments/assets/60972640-f21c-4487-b46d-11b8e019a56b" />
+<br>
+
+  1. Browser gets a presigned upload URL from the API.
+  2. Browser uploads the original image directly to MinIO.
+  3. Browser asks the API to create a job.
+  4. API stores job metadata in PostgreSQL and enqueues the job ID in Redis.
+  5. Worker claims the job, downloads the source image from MinIO, and generates variants.
+  6. Worker uploads outputs to MinIO and saves output metadata in PostgreSQL.
+  7. Browser asks the API for results.
+  8. API returns presigned download URLs.
+  9. Browser downloads generated outputs directly from MinIO
+
+
 
 The API and workers are separate deployable units. Workers can be scaled independently from the API, and the queue boundary keeps image processing off the latency-sensitive request path.
 

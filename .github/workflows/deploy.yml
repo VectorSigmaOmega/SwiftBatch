@@ -146,3 +146,11 @@ jobs:
           remote_release="/opt/photon/releases/${GITHUB_SHA}-${GITHUB_RUN_ID}"
           ssh -p "$DEPLOY_PORT" -i ~/.ssh/photon_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
             "if [ -e '$remote_release' ]; then echo 'release already exists: $remote_release' >&2; exit 1; fi && sudo install -d -m 0755 -o ubuntu -g ubuntu '$remote_release' && tar -xzf /tmp/photon-deploy.tgz -C '$remote_release' && rm /tmp/photon-deploy.tgz && sudo ln -sfn '$remote_release' /opt/photon/current && cd /opt/photon/current && ./scripts/deploy-compose.sh"
+
+      - name: Install nginx site
+        shell: bash
+        run: |
+          scp -P "$DEPLOY_PORT" -i ~/.ssh/photon_deploy_key deploy/nginx/photon.conf \
+            "$DEPLOY_USER@$DEPLOY_HOST:/tmp/photon-nginx.conf"
+          ssh -p "$DEPLOY_PORT" -i ~/.ssh/photon_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "sudo install -m 0644 -o root -g root /tmp/photon-nginx.conf /etc/nginx/sites-available/photon && sudo ln -sfn /etc/nginx/sites-available/photon /etc/nginx/sites-enabled/photon && sudo nginx -t && sudo systemctl reload nginx && rm /tmp/photon-nginx.conf"

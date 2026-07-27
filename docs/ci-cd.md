@@ -28,6 +28,8 @@ Instead it:
 - updates `/opt/photon/current`
 - starts the stack with Docker Compose
 - waits for `GET /readyz` on the local API port
+- installs `deploy/nginx/photon.conf` as `/etc/nginx/sites-available/photon`
+- reloads nginx after a successful config test
 
 The production Compose override binds Postgres, Redis, MinIO, the API, and worker metrics to localhost-only ports so the host nginx layer remains the only public HTTP/S entry point.
 

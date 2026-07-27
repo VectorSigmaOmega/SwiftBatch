@@ -1,0 +1,49 @@
+services:
+  postgres:
+    ports: !override []
+    restart: unless-stopped
+
+  redis:
+    ports: !override []
+    restart: unless-stopped
+
+  minio:
+    environment:
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_API_CORS_ALLOW_ORIGIN:-https://photon.abhinash.dev}
+      MINIO_BROWSER_REDIRECT_URL: ${MINIO_BROWSER_REDIRECT_URL:-https://minio.photon.abhinash.dev}
+      MINIO_SERVER_URL: ${MINIO_SERVER_URL:-https://storage.photon.abhinash.dev}
+    ports: !override
+      - "127.0.0.1:${PHOTON_MINIO_API_PUBLISHED_PORT:-9000}:9000"
+      - "127.0.0.1:${PHOTON_MINIO_CONSOLE_PUBLISHED_PORT:-9001}:9001"
+    restart: unless-stopped
+
+  createbuckets:
+    restart: "no"
+
+  migrate:
+    restart: "no"
+
+  api:
+    environment:
+      PHOTON_ENV: ${PHOTON_ENV:-production}
+      PHOTON_STORAGE_PUBLIC_BASE_URL: ${PHOTON_STORAGE_PUBLIC_BASE_URL:-https://storage.photon.abhinash.dev}
+      PHOTON_STORAGE_USE_SSL: ${PHOTON_STORAGE_USE_SSL:-false}
+    ports: !override
+      - "127.0.0.1:${PHOTON_API_PUBLISHED_PORT:-18080}:8080"
+    restart: unless-stopped
+
+  worker:
+    environment:
+      PHOTON_ENV: ${PHOTON_ENV:-production}
+      PHOTON_STORAGE_PUBLIC_BASE_URL: ${PHOTON_STORAGE_PUBLIC_BASE_URL:-https://storage.photon.abhinash.dev}
+      PHOTON_STORAGE_USE_SSL: ${PHOTON_STORAGE_USE_SSL:-false}
+    ports: !override
+      - "127.0.0.1:${PHOTON_WORKER_METRICS_PUBLISHED_PORT:-18081}:8081"
+    restart: unless-stopped
+
+  cleanup:
+    environment:
+      PHOTON_ENV: ${PHOTON_ENV:-production}
+      PHOTON_STORAGE_PUBLIC_BASE_URL: ${PHOTON_STORAGE_PUBLIC_BASE_URL:-https://storage.photon.abhinash.dev}
+      PHOTON_STORAGE_USE_SSL: ${PHOTON_STORAGE_USE_SSL:-false}
+    restart: unless-stopped

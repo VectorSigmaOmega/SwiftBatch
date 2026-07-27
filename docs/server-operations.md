@@ -4,10 +4,10 @@ This document records the current manual access and hardening state of the live 
 
 ## Current Server
 
-- provider: `SkyServer`
-- OS: `Ubuntu 22.04`
-- hostname: `node1.photon.abhinash.dev`
-- public IP: `161.248.163.187`
+- provider: `OVHcloud`
+- OS: `Ubuntu 24.04`
+- hostname: `vps-be504035`
+- public IP: `144.217.4.173`
 
 ## DNS Control Plane
 
@@ -24,42 +24,42 @@ The current public names are:
 If a future note says "update DNS", it means:
 
 - add or update `A` records in the Lightsail DNS zone shown in the AWS console
+- point the records at `144.217.4.173`
 
 ## SSH Access Model
 
-The server should now be accessed through the `deploy` user with a dedicated SSH key.
+The server should now be accessed through the `ubuntu` user with a dedicated SSH key.
 
 Expected login pattern:
 
 ```bash
-ssh -i ~/.ssh/photon_skyserver_ed25519 deploy@161.248.163.187
+ssh -i ~/.ssh/ovh_vps3_ed25519 ubuntu@144.217.4.173
 ```
 
 Useful convenience entry for `~/.ssh/config`:
 
 ```sshconfig
-Host photon-skyserver
-    HostName 161.248.163.187
-    User deploy
-    IdentityFile ~/.ssh/photon_skyserver_ed25519
+Host photon-ovh
+    HostName 144.217.4.173
+    User ubuntu
+    IdentityFile ~/.ssh/ovh_vps3_ed25519
     IdentitiesOnly yes
 ```
 
 Then login becomes:
 
 ```bash
-ssh photon-skyserver
+ssh photon-ovh
 ```
 
 ## Hardening Performed
 
-The following baseline hardening was applied before `k3s` installation:
+The following baseline hardening was applied before application deployment:
 
-- created a dedicated SSH keypair for this VPS
-- created a non-root admin user: `deploy`
-- added `deploy` to the `sudo` group
-- enabled passwordless `sudo` for `deploy`
-- installed the server key for `deploy`
+- installed a dedicated SSH keypair for this VPS
+- retained the OVH-provided non-root admin user: `ubuntu`
+- confirmed passwordless `sudo` for `ubuntu`
+- installed the server key for `ubuntu`
 - updated the package set with `apt-get update` and `apt-get upgrade -y`
 - installed and enabled `ufw`
 - opened only:
@@ -74,7 +74,7 @@ The following baseline hardening was applied before `k3s` installation:
 
 The intended current posture is:
 
-- remote admin access goes through `deploy`
+- remote admin access goes through `ubuntu`
 - `sudo` is used for privileged operations
 - `root` does not log in over SSH
 - password-based SSH login is disabled
@@ -83,25 +83,32 @@ The intended current posture is:
 ## Important Operational Notes
 
 - The root password that was used for first access should be considered temporary and effectively burned once exposed in setup history.
-- The dedicated SSH key at `~/.ssh/photon_skyserver_ed25519` is now part of the server access path and should be retained carefully.
-- If CI/CD later deploys by SSH, it should target the `deploy` user, not `root`.
+- The dedicated SSH key at `~/.ssh/ovh_vps3_ed25519` is now part of the server access path and should be retained carefully.
+- CI/CD deploys by SSH to the `ubuntu` user, not `root`.
 
-## Kubernetes Access
+## Runtime Layout
 
-`k3s` is installed on the server.
+Photon runs with Docker Compose.
 
-The working kubeconfig path on the box is:
+- release directories: `/opt/photon/releases/`
+- active release symlink: `/opt/photon/current`
+- environment file: `/etc/photon/photon.env`
+- compose project: `photon`
 
-```text
-/home/deploy/.kube/config
-```
+The public HTTP/S entry point is nginx. Compose binds service ports to `127.0.0.1` only:
 
-Examples:
+- API/frontend: `127.0.0.1:18080`
+- worker metrics: `127.0.0.1:18081`
+- MinIO S3 API: `127.0.0.1:9000`
+- MinIO console: `127.0.0.1:9001`
+
+The nginx site config is tracked at `deploy/nginx/photon.conf` and is installed as `/etc/nginx/sites-available/photon`.
 
 ```bash
-ssh photon-skyserver
-kubectl --kubeconfig=/home/deploy/.kube/config get nodes -o wide
-kubectl --kubeconfig=/home/deploy/.kube/config get pods -A
+ssh photon-ovh
+cd /opt/photon/current
+./scripts/deploy-compose.sh
+docker compose --project-name photon --env-file /etc/photon/photon.env -f deploy/docker/docker-compose.yml -f deploy/docker/docker-compose.production.yml ps
 ```
 
 ## If Access Stops Working

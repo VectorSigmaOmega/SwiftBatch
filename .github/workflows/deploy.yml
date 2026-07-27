@@ -11,14 +11,13 @@ on:
       - "frontend/**"
       - "internal/**"
       - "deploy/docker/**"
-      - "deploy/k8s/**"
-      - "scripts/deploy-k8s.sh"
+      - "deploy/nginx/**"
+      - "scripts/deploy-compose.sh"
       - "go.mod"
       - "go.sum"
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: photon-deploy-main
@@ -29,9 +28,9 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DEPLOY_HOST: ${{ vars.PHOTON_DEPLOY_HOST || vars.SWIFTBATCH_DEPLOY_HOST }}
-      DEPLOY_PORT: ${{ vars.PHOTON_DEPLOY_PORT || vars.SWIFTBATCH_DEPLOY_PORT || '22' }}
-      DEPLOY_USER: ${{ vars.PHOTON_DEPLOY_USER || vars.SWIFTBATCH_DEPLOY_USER || 'deploy' }}
+      DEPLOY_HOST: ${{ vars.PHOTON_DEPLOY_HOST }}
+      DEPLOY_PORT: ${{ vars.PHOTON_DEPLOY_PORT || '22' }}
+      DEPLOY_USER: ${{ vars.PHOTON_DEPLOY_USER || 'ubuntu' }}
 
     steps:
       - name: Checkout
@@ -44,78 +43,36 @@ jobs:
           test -n "$DEPLOY_USER"
           test -n "$DEPLOY_PORT"
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
 
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Check embedded frontend assets
+        run: git diff --exit-code -- internal/api/httpserver/static
+
       - name: Run tests
         run: go test ./...
-
-      - name: Compute image metadata
-        id: meta
-        shell: bash
-        run: |
-          owner_lower="${GITHUB_REPOSITORY_OWNER,,}"
-          echo "owner_lower=$owner_lower" >> "$GITHUB_OUTPUT"
-          echo "api_image=ghcr.io/$owner_lower/photon-api:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "worker_image=ghcr.io/$owner_lower/photon-worker:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "migrate_image=ghcr.io/$owner_lower/photon-migrate:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "cleanup_image=ghcr.io/$owner_lower/photon-cleanup:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push API image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: deploy/docker/Dockerfile.api
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.api_image }}
-            ghcr.io/${{ steps.meta.outputs.owner_lower }}/photon-api:latest
-
-      - name: Build and push worker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: deploy/docker/Dockerfile.worker
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.worker_image }}
-            ghcr.io/${{ steps.meta.outputs.owner_lower }}/photon-worker:latest
-
-      - name: Build and push migrate image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: deploy/docker/Dockerfile.migrate
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.migrate_image }}
-            ghcr.io/${{ steps.meta.outputs.owner_lower }}/photon-migrate:latest
-
-      - name: Build and push cleanup image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: deploy/docker/Dockerfile.cleanup
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.cleanup_image }}
-            ghcr.io/${{ steps.meta.outputs.owner_lower }}/photon-cleanup:latest
 
       - name: Prepare SSH key
         shell: bash
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s\n' '${{ secrets.PHOTON_DEPLOY_SSH_PRIVATE_KEY || secrets.SWIFTBATCH_DEPLOY_SSH_PRIVATE_KEY }}' > ~/.ssh/photon_deploy_key
+          printf '%s\n' '${{ secrets.PHOTON_DEPLOY_SSH_PRIVATE_KEY }}' > ~/.ssh/photon_deploy_key
           chmod 600 ~/.ssh/photon_deploy_key
           for attempt in 1 2 3 4 5; do
             if ssh-keyscan -T 15 -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts; then
@@ -138,45 +95,54 @@ jobs:
           scp -P "$DEPLOY_PORT" -i ~/.ssh/photon_deploy_key /tmp/photon-deploy.tgz \
             "$DEPLOY_USER@$DEPLOY_HOST:/tmp/photon-deploy.tgz"
 
-      - name: Deploy to k3s
+      - name: Upload environment file
         shell: bash
         env:
-          API_IMAGE: ${{ steps.meta.outputs.api_image }}
-          WORKER_IMAGE: ${{ steps.meta.outputs.worker_image }}
-          MIGRATE_IMAGE: ${{ steps.meta.outputs.migrate_image }}
-          CLEANUP_IMAGE: ${{ steps.meta.outputs.cleanup_image }}
-          GF_SECURITY_ADMIN_USER: ${{ secrets.GF_SECURITY_ADMIN_USER }}
-          GF_SECURITY_ADMIN_PASSWORD: ${{ secrets.GF_SECURITY_ADMIN_PASSWORD }}
+          PHOTON_POSTGRES_PASSWORD: ${{ secrets.PHOTON_POSTGRES_PASSWORD }}
+          PHOTON_STORAGE_ACCESS_KEY: ${{ secrets.PHOTON_STORAGE_ACCESS_KEY }}
+          PHOTON_STORAGE_SECRET_KEY: ${{ secrets.PHOTON_STORAGE_SECRET_KEY }}
           MINIO_ROOT_USER: ${{ secrets.MINIO_ROOT_USER }}
           MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
-          PHOTON_POSTGRES_PASSWORD: ${{ secrets.PHOTON_POSTGRES_PASSWORD || secrets.SWIFTBATCH_POSTGRES_PASSWORD }}
-          PHOTON_STORAGE_ACCESS_KEY: ${{ secrets.PHOTON_STORAGE_ACCESS_KEY || secrets.SWIFTBATCH_STORAGE_ACCESS_KEY }}
-          PHOTON_STORAGE_SECRET_KEY: ${{ secrets.PHOTON_STORAGE_SECRET_KEY || secrets.SWIFTBATCH_STORAGE_SECRET_KEY }}
         run: |
-          cat > /tmp/photon-remote-deploy.sh <<EOF
-          #!/usr/bin/env bash
-          set -euo pipefail
-          rm -rf /home/deploy/photon
-          mkdir -p /home/deploy/photon
-          tar -xzf /tmp/photon-deploy.tgz -C /home/deploy/photon
-          cd /home/deploy/photon
-          chmod +x scripts/deploy-k8s.sh
-          export GF_SECURITY_ADMIN_USER=$(printf '%q' "$GF_SECURITY_ADMIN_USER")
-          export GF_SECURITY_ADMIN_PASSWORD=$(printf '%q' "$GF_SECURITY_ADMIN_PASSWORD")
-          export MINIO_ROOT_USER=$(printf '%q' "$MINIO_ROOT_USER")
-          export MINIO_ROOT_PASSWORD=$(printf '%q' "$MINIO_ROOT_PASSWORD")
-          export PHOTON_POSTGRES_PASSWORD=$(printf '%q' "$PHOTON_POSTGRES_PASSWORD")
-          export PHOTON_STORAGE_ACCESS_KEY=$(printf '%q' "$PHOTON_STORAGE_ACCESS_KEY")
-          export PHOTON_STORAGE_SECRET_KEY=$(printf '%q' "$PHOTON_STORAGE_SECRET_KEY")
-          export PHOTON_API_IMAGE=$(printf '%q' "$API_IMAGE")
-          export PHOTON_WORKER_IMAGE=$(printf '%q' "$WORKER_IMAGE")
-          export PHOTON_MIGRATE_IMAGE=$(printf '%q' "$MIGRATE_IMAGE")
-          export PHOTON_CLEANUP_IMAGE=$(printf '%q' "$CLEANUP_IMAGE")
-          ./scripts/deploy-k8s.sh
-          EOF
+          test -n "$PHOTON_POSTGRES_PASSWORD"
+          test -n "$PHOTON_STORAGE_ACCESS_KEY"
+          test -n "$PHOTON_STORAGE_SECRET_KEY"
 
-          scp -P "$DEPLOY_PORT" -i ~/.ssh/photon_deploy_key /tmp/photon-remote-deploy.sh \
-            "$DEPLOY_USER@$DEPLOY_HOST:/tmp/photon-remote-deploy.sh"
+          root_user="${MINIO_ROOT_USER:-$PHOTON_STORAGE_ACCESS_KEY}"
+          root_password="${MINIO_ROOT_PASSWORD:-$PHOTON_STORAGE_SECRET_KEY}"
+
+          {
+            printf 'PHOTON_ENV=production\n'
+            printf 'PHOTON_COMPOSE_PROJECT=photon\n'
+            printf 'PHOTON_POSTGRES_DB=photon\n'
+            printf 'PHOTON_POSTGRES_USER=photon\n'
+            printf 'PHOTON_POSTGRES_PASSWORD=%s\n' "$PHOTON_POSTGRES_PASSWORD"
+            printf 'PHOTON_STORAGE_ACCESS_KEY=%s\n' "$PHOTON_STORAGE_ACCESS_KEY"
+            printf 'PHOTON_STORAGE_SECRET_KEY=%s\n' "$PHOTON_STORAGE_SECRET_KEY"
+            printf 'MINIO_ROOT_USER=%s\n' "$root_user"
+            printf 'MINIO_ROOT_PASSWORD=%s\n' "$root_password"
+            printf 'PHOTON_STORAGE_BUCKET=photon\n'
+            printf 'PHOTON_STORAGE_PUBLIC_BASE_URL=https://storage.photon.abhinash.dev\n'
+            printf 'PHOTON_STORAGE_USE_SSL=false\n'
+            printf 'MINIO_API_CORS_ALLOW_ORIGIN=https://photon.abhinash.dev\n'
+            printf 'MINIO_SERVER_URL=https://storage.photon.abhinash.dev\n'
+            printf 'MINIO_BROWSER_REDIRECT_URL=https://minio.photon.abhinash.dev\n'
+            printf 'PHOTON_WORKER_CONCURRENCY=2\n'
+            printf 'PHOTON_API_PUBLISHED_PORT=18080\n'
+            printf 'PHOTON_WORKER_METRICS_PUBLISHED_PORT=18081\n'
+            printf 'PHOTON_MINIO_API_PUBLISHED_PORT=9000\n'
+            printf 'PHOTON_MINIO_CONSOLE_PUBLISHED_PORT=9001\n'
+          } > /tmp/photon.env
+
+          scp -P "$DEPLOY_PORT" -i ~/.ssh/photon_deploy_key /tmp/photon.env \
+            "$DEPLOY_USER@$DEPLOY_HOST:/tmp/photon.env"
 
           ssh -p "$DEPLOY_PORT" -i ~/.ssh/photon_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
-            'bash /tmp/photon-remote-deploy.sh'
+            'sudo install -m 0750 -o root -g ubuntu -d /etc/photon && sudo install -m 0640 -o root -g ubuntu /tmp/photon.env /etc/photon/photon.env && rm /tmp/photon.env'
+
+      - name: Deploy to Docker Compose
+        shell: bash
+        run: |
+          remote_release="/opt/photon/releases/${GITHUB_SHA}-${GITHUB_RUN_ID}"
+          ssh -p "$DEPLOY_PORT" -i ~/.ssh/photon_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "if [ -e '$remote_release' ]; then echo 'release already exists: $remote_release' >&2; exit 1; fi && sudo install -d -m 0755 -o ubuntu -g ubuntu '$remote_release' && tar -xzf /tmp/photon-deploy.tgz -C '$remote_release' && rm /tmp/photon-deploy.tgz && sudo ln -sfn '$remote_release' /opt/photon/current && cd /opt/photon/current && ./scripts/deploy-compose.sh"

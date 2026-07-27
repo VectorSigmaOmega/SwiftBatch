@@ -1,6 +1,6 @@
 # CI/CD Setup
 
-This document explains how the GitHub Actions scaffolding deploys Photon to the SkyServer VPS.
+This document explains how the GitHub Actions scaffolding deploys Photon to the OVH VPS.
 
 ## Workflow Shape
 
@@ -13,22 +13,23 @@ The repo now contains two workflows:
 - `.github/workflows/deploy.yml`
   - runs on pushes to `main`
   - can also be started manually with `workflow_dispatch`
-  - builds and pushes `api`, `worker`, `cleanup`, and `migrate` images to `GHCR`
-  - uploads the repo contents to the VPS over SSH
-  - runs `scripts/deploy-k8s.sh` on the server
+  - builds the frontend and runs `go test ./...`
+  - uploads the repo contents and a generated environment file to the VPS over SSH
+  - runs `scripts/deploy-compose.sh` on the server
 
 ## Deployment Model
 
-The deployment workflow does not keep Kubernetes secrets in the repo.
+The deployment workflow does not keep runtime secrets in the repo.
 
 Instead it:
 
-- pushes immutable image tags to `GHCR`
-- creates the `photon-secrets` Kubernetes secret from GitHub repository secrets
-- applies the manifests
-- waits for deployment rollouts
+- writes `/etc/photon/photon.env` from GitHub repository secrets
+- extracts the source into `/opt/photon/releases/<sha>-<run-id>`
+- updates `/opt/photon/current`
+- starts the stack with Docker Compose
+- waits for `GET /readyz` on the local API port
 
-This is the intended replacement for the old committed-secret approach.
+The production Compose override binds Postgres, Redis, MinIO, the API, and worker metrics to localhost-only ports so the host nginx layer remains the only public HTTP/S entry point.
 
 ## Required GitHub Repository Variables
 
@@ -39,9 +40,9 @@ Set these in:
 Required variables:
 
 - `PHOTON_DEPLOY_HOST`
-  - current value: `161.248.163.187`
+  - current value: `144.217.4.173`
 - `PHOTON_DEPLOY_USER`
-  - current value: `deploy`
+  - current value: `ubuntu`
 - `PHOTON_DEPLOY_PORT`
   - current value: `22`
 
@@ -54,38 +55,28 @@ Set these in:
 Required secrets:
 
 - `PHOTON_DEPLOY_SSH_PRIVATE_KEY`
-  - the private key that matches the server access path for `deploy`
-- `GF_SECURITY_ADMIN_USER`
-- `GF_SECURITY_ADMIN_PASSWORD`
+  - the private key that matches the server access path for `ubuntu`
 - `MINIO_ROOT_USER`
 - `MINIO_ROOT_PASSWORD`
 - `PHOTON_POSTGRES_PASSWORD`
 - `PHOTON_STORAGE_ACCESS_KEY`
 - `PHOTON_STORAGE_SECRET_KEY`
 
-## Notes On GHCR Credentials
-
-The workflow pushes images to `GHCR` using GitHub Actions' built-in `GITHUB_TOKEN`.
-
-Because this repository and its published container images are public, the cluster pulls the images anonymously. That means no separate `GHCR_PULL_TOKEN` is required for the current deployment model.
-
-If the repo or packages are made private later, a cluster pull credential will need to be reintroduced.
-
 ## Server-Side Deploy Entry Point
 
 The server-side entry point is:
 
-- [scripts/deploy-k8s.sh](../scripts/deploy-k8s.sh)
+- [scripts/deploy-compose.sh](../scripts/deploy-compose.sh)
 
-That script expects the deployment environment variables to already be present. The GitHub Actions deploy workflow sets them before invoking the script remotely.
+That script expects `/etc/photon/photon.env` to be present and readable by the deploy user. The GitHub Actions deploy workflow creates it before invoking the script remotely.
 
 ## First Deployment Checklist
 
 Before expecting the deploy workflow to succeed, confirm:
 
-1. DNS `A` records point at the VPS
-2. `k3s` is healthy on the server
-3. the `deploy` user can SSH in with the configured key
+1. DNS `A` records for `photon.abhinash.dev` and `storage.photon.abhinash.dev` point at the VPS
+2. Docker and Docker Compose are healthy on the server
+3. the `ubuntu` user can SSH in with the configured key
 4. GitHub variables and secrets are configured
 5. the repo is pushed to `main`
 
@@ -97,5 +88,6 @@ That means these still belong to manual infrastructure setup:
 
 - Ubuntu server provisioning
 - SSH hardening
-- `k3s` installation
+- Docker installation
+- nginx and TLS setup
 - DNS setup
